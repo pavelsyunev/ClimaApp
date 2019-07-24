@@ -2,26 +2,18 @@
 //  ViewController.swift
 //  WeatherApp
 //
-//  Created by Angela Yu on 23/08/2015.
-//  Copyright (c) 2015 London App Brewery. All rights reserved.
-//
+//  /***Get your own App ID at https://openweathermap.org/appid ****/
 
 import UIKit
 import CoreLocation
 import Alamofire
 import SwiftyJSON
 
-class WeatherViewController: UIViewController, CLLocationManagerDelegate, ChangeCityDelegate {
-    
-    //Weather constants
-    //let WEATHER_URL = "http://api.openweathermap.org/data/2.5/weather"
-    let APP_ID = "f856e155f5c5001294552aa4b040bd9d"
-    
+class WeatherViewController: UIViewController, CLLocationManagerDelegate, FavoritCityWeatherDelegate {
+
     //Forecast constants
     let WEATHER_URL = "http://api.openweathermap.org/data/2.5/forecast"
-    //let APP_ID = "f856e155f5c5001294552aa4b040bd9d"
-    
-    /***Get your own App ID at https://openweathermap.org/appid ****/
+    let APP_ID = "f856e155f5c5001294552aa4b040bd9d"
     
     //TODO: Declare instance variables here
     let locationManager = CLLocationManager()
@@ -31,6 +23,12 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate, Change
     @IBOutlet weak var weatherIcon: UIImageView!
     @IBOutlet weak var cityLabel: UILabel!
     @IBOutlet weak var temperatureLabel: UILabel!
+    @IBOutlet weak var discriptionLabel: UILabel!
+    
+    @IBOutlet weak var cloudsLabel: UILabel!
+    @IBOutlet weak var windLabel: UILabel!
+    @IBOutlet weak var pressureLabel: UILabel!
+    @IBOutlet weak var humidityLabel: UILabel!
     
     //@IBOutlet weak var forecastTemp: UITableView!
     @IBOutlet weak var dayOneForecast: UILabel!
@@ -45,12 +43,19 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate, Change
     @IBOutlet weak var dayFourTemp: UILabel!
     @IBOutlet weak var dayFiveTemp: UILabel!
     
+    @IBOutlet weak var dayOneIcon: UIImageView!
+    @IBOutlet weak var dayTwoIcon: UIImageView!
+    @IBOutlet weak var dayTreeIcon: UIImageView!
+    @IBOutlet weak var dayFourIcon: UIImageView!
+    @IBOutlet weak var dayFiveIcon: UIImageView!
+    
+    @IBOutlet weak var updateSpinner: UIActivityIndicatorView!
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        
         //TODO:Set up the location manager here.
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
         locationManager.requestWhenInUseAuthorization()
         locationManager.startUpdatingLocation()
     }
@@ -58,14 +63,14 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate, Change
     //MARK: - Networking
     /***************************************************************/
     //Write the getWeatherData method here:
-    func getWeatherData(url: String, parameters: [String: String]) {
+    func getWeatherData(url: String, parameters: [String: String], complition: @escaping (_ result: JSON) -> ()) {
+        
         Alamofire.request(url, method: .get, parameters: parameters).responseJSON {
             response in
             if response.result.isSuccess {
-                //print("Success, got the weather data!")
                 let weatherJSON : JSON = JSON(response.result.value!)
-                //print("This is JSON data: ", weatherJSON)
-                self.updateWeatherData(json: weatherJSON)
+                //print(weatherJSON) //To see main JASON
+                complition(weatherJSON)
             }
             else {
                 self.cityLabel.text = "Connection Issues"
@@ -76,93 +81,81 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate, Change
     //MARK: - JSON Parsing
     /***************************************************************/
     //Write the updateWeatherData method here:
-    
-    //    func updateWeatherData(json : JSON) {
-    //        if let tempResult = json["main"]["temp"].double {
-    //            weatherDataModel.temperature = Int(tempResult - 273.15)
-    //            weatherDataModel.city = json["name"].stringValue
-    //            weatherDataModel.condition = json["weather"][0]["id"].intValue
-    //            weatherDataModel.weatherIconName = weatherDataModel.updateWeatherIcon(condition: weatherDataModel.condition)
-    //            updateUIWithWeatherData()
-    //        }
-    //        else {
-    //            cityLabel.text = "Weather Unavailable"
-    //        }
-    //    }
-    
-    
+    var fCities : [FavoritCitiesDataModel] = []
+
     func updateWeatherData(json : JSON) {
+        //Set main city and check the Error
+        if let cityName = json["city"]["name"].string {
         
         //Get time
         let arrayTime = json["list"].arrayValue.map {$0["dt_txt"].stringValue}
-        let singlTimeOne = arrayTime[1].components(separatedBy: " ")
-        let singlTimeTwo = arrayTime[2].components(separatedBy: " ")
-        let singlTimeThree = arrayTime[3].components(separatedBy: " ")
-        let singlTimeFour = arrayTime[4].components(separatedBy: " ")
-        let singlTimeFive = arrayTime[5].components(separatedBy: " ")
-        
-        dayOneForecast.text = singlTimeOne.last ?? ""
-        dayTwoForecast.text = singlTimeTwo.last ?? ""
-        dayThreeForecast.text = singlTimeThree.last ?? ""
-        dayFourForecast.text = singlTimeFour.last ?? ""
-        dayFiveForecast.text = singlTimeFive.last ?? ""
-        
-        //Get temperature forecast
-        let arrayTemp = json["list"].arrayValue.map {$0["main"]["temp"].doubleValue}
-        let singlTempOne = Int(arrayTemp[1] - 273.15)
-        let singlTempTwo = Int(arrayTemp[2] - 273.15)
-        let singlTempThree = Int(arrayTemp[3] - 273.15)
-        let singlTempFour = Int(arrayTemp[4] - 273.15)
-        let singlTempFive = Int(arrayTemp[5] - 273.15)
-        
-        dayOneTemp.text = "\(singlTempOne)℃"
-        dayTwoTemp.text = "\(singlTempTwo)℃"
-        dayThreeTemp.text = "\(singlTempThree)℃"
-        dayFourTemp.text = "\(singlTempFour)℃"
-        dayFiveTemp.text = "\(singlTempFive)℃"
-        
-        //Set main temp
-        weatherDataModel.temperature = Int(arrayTemp[0] - 273.15)
-        weatherDataModel.city = json["city"]["name"].stringValue
-        weatherDataModel.condition = json["list"][0]["weather"][0]["id"].intValue
-        weatherDataModel.weatherIconName = weatherDataModel.updateWeatherIcon(condition: weatherDataModel.condition)
-
-        updateUIWithWeatherData()
-        
-//        let arrayTime = json["list"].arrayValue.map {$0["dt_txt"].stringValue}
-//        print(arrayTime[1])
-//        arrayTime[1...5].forEach { singlTime in
-//            let singlTime2 = singlTime.components(separatedBy: " ")
-//            //print(singlTime2.last ?? "")
-//        }
-
+        weatherDataModel.time = weatherDataModel.updateTimeArray(time: arrayTime)
+            
         //Get temperature
-//        let arrayTemp = json["list"].arrayValue.map({$0["main"]["temp"].intValue})
-//        arrayTemp[1...5].forEach { singlTemp in
-//            //print(singlTemp)
-//        }
+        let arrayTemp = json["list"].arrayValue.map {$0["main"]["temp"].doubleValue}
+        weatherDataModel.temp = weatherDataModel.updateTempArray(temp: arrayTemp)
         
-        //GEt today date and time
-        //let now = Date()
-        //let formatter = DateFormatter()
-        //formatter.timeZone = TimeZone.current
-        //formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        //formatter.dateFormat = "yyyy-MM-dd"
-        //let dateString = formatter.string(from: now)
-        //let singlDate = dateString.components(separatedBy: " ")
-        //print(singlDate)
-        //print(dateString)
+        //Get condition for icons
+        let arrayIcons = json["list"].arrayValue.map {$0["weather"][0]["id"].intValue}
+        weatherDataModel.weatherIconName = weatherDataModel.singleCondition(condition: arrayIcons)
+            
+        //Get weather description
+        let arrayDescription = json["list"].arrayValue.map {$0["weather"][0]["description"].stringValue}
+        let descript = arrayDescription[0].capitalized(with: nil)
+        
+        //Get clouds %
+        let arrayClouds = json["list"].arrayValue.map {$0["clouds"]["all"].intValue}
+        
+        //Get wind speed
+        let arrayWind = json["list"].arrayValue.map {$0["wind"]["speed"].intValue}
+        
+        //Get pressure
+        let arrayPressure = json["list"].arrayValue.map {$0["main"]["pressure"].doubleValue}
+        let pressure = weatherDataModel.updatePressure(pressure: arrayPressure[0])
+        
+        //Get humidity
+        let arrayHumidity = json["list"].arrayValue.map {$0["main"]["humidity"].intValue}
+            
+        fCities.append(FavoritCitiesDataModel(fCity: cityName, fTime: weatherDataModel.time, fTemp: weatherDataModel.temp, fIcon: weatherDataModel.weatherIconName, fDisc: descript, fClouds: arrayClouds[0], fWind: arrayWind[0], fPress: pressure, fHumid: arrayHumidity[0]))
+        }
+        else {
+            cityLabel.text = "Weather Unavailable"
+        }
     }
     
     //MARK: - UI Updates
     /***************************************************************/
     //Write the updateUIWithWeatherData method here:
-    func updateUIWithWeatherData() {
-        cityLabel.text = weatherDataModel.city
-        temperatureLabel.text = "\(weatherDataModel.temperature)℃"
-        weatherIcon.image = UIImage(named: weatherDataModel.weatherIconName)
+    func updateUIWithWeatherData(weatherData : FavoritCitiesDataModel) {
+        cityLabel.text = weatherData.fCity
+        temperatureLabel.text = "\(weatherData.fTemp[0])°"
+        weatherIcon.image = UIImage(named: weatherData.fIcon[0])
+        discriptionLabel.text = weatherData.fDisc
+
+        dayOneForecast.text = weatherData.fTime[1]
+        dayTwoForecast.text = weatherData.fTime[2]
+        dayThreeForecast.text = weatherData.fTime[3]
+        dayFourForecast.text = weatherData.fTime[4]
+        dayFiveForecast.text = weatherData.fTime[5]
+
+        dayOneTemp.text = "\(weatherData.fTemp[1])°"
+        dayTwoTemp.text = "\(weatherData.fTemp[2])°"
+        dayThreeTemp.text = "\(weatherData.fTemp[3])°"
+        dayFourTemp.text = "\(weatherData.fTemp[4])°"
+        dayFiveTemp.text = "\(weatherData.fTemp[5])°"
+
+        dayOneIcon.image = UIImage(named: weatherData.fIcon[1])
+        dayTwoIcon.image = UIImage(named: weatherData.fIcon[2])
+        dayTreeIcon.image = UIImage(named: weatherData.fIcon[3])
+        dayFourIcon.image = UIImage(named: weatherData.fIcon[4])
+        dayFiveIcon.image = UIImage(named: weatherData.fIcon[5])
         
-        //dayOneForecast.text = weatherDataModel.time
+        cloudsLabel.text = "\(weatherData.fClouds) %"
+        windLabel.text = "\(weatherData.fWind) m/s"
+        pressureLabel.text = "\(Int(weatherData.fPress)) mmHg"
+        humidityLabel.text = "\(weatherData.fHumid) %"
+        
+        updateSpinner.stopAnimating()
     }
     
     //MARK: - Location Manager Delegate Methods
@@ -170,40 +163,111 @@ class WeatherViewController: UIViewController, CLLocationManagerDelegate, Change
     //Write the didUpdateLocations method here:
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         let location = locations[locations.count - 1]
+        
         if location.horizontalAccuracy > 0 {
             locationManager.stopUpdatingLocation()
             locationManager.delegate = nil
-            
+
             let latitude = String(location.coordinate.latitude)
             let longetude = String(location.coordinate.longitude)
             let params : [String : String] = ["lat" : latitude, "lon" : longetude, "appid" : APP_ID]
-            
-            getWeatherData(url: WEATHER_URL, parameters: params)
+
+            getWeatherData(url: WEATHER_URL, parameters: params) { (JSON) in
+                self.updateWeatherData(json: JSON)
+                self.favoriteCitiesTemp()
+            }
         }
     }
     
     //Write the didFailWithError method here:
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        //print(error)
         cityLabel.text = "Location Unavailably"
     }
     
+    //Update viewController to get existing user location (refresh data)
+    @IBAction func updateLocation(_ sender: UIBarButtonItem) {
+        fCities = []
+        updateSpinner.startAnimating()
+        self.viewDidLoad()
+        self.viewWillAppear(true)
+    }
+
+    //City search popup for
+    var city : String = ""
+    
+    @IBAction func searchLocation(_ sender: UIBarButtonItem) {
+        var textField = UITextField()
+        
+        let alert = UIAlertController(title: "Enter city name for weather", message: "", preferredStyle: .alert)
+        let action = UIAlertAction(title: "Get weather", style: .default) { (action) in
+            
+            self.city = textField.text!
+            
+            let params : [String : String] = ["q" : self.city, "appid" : self.APP_ID]
+            self.getWeatherData(url: self.WEATHER_URL, parameters: params) { (JSON) in
+                self.updateWeatherData(json: JSON)
+                let searchCity = self.fCities[self.fCities.count - 1]
+                self.updateUIWithWeatherData(weatherData: searchCity)
+            }
+        }
+        alert.addTextField { (alertTextField) in
+            alertTextField.placeholder = "Enter city name"
+            textField = alertTextField
+        }
+        alert.addAction(action)
+        present(alert, animated: true, completion: nil)
+    }
+    
+    //Add city to favorite
+    @IBAction func addLocationToFavorite(_ sender: Any) {
+        weatherDataModel.favoriteCity(city: city.lowercased())
+    }
+    
+    //Get favoriet cities weather data
+    func favoriteCitiesTemp() {
+        //Update UI for local weather
+        updateUIWithWeatherData(weatherData: fCities[0])
+        let cities = weatherDataModel.favoriteLocation
+        cities.forEach { city in
+            userEnteredNewCityName(city: city)
+        }
+    }
+
     //MARK: - Change City Delegate methods
     /***************************************************************/
     //Write the userEnteredANewCityName Delegate method here:
     func userEnteredNewCityName(city: String) {
         print(city)
+        
         let params : [String : String] = ["q" : city, "appid" : APP_ID]
-        getWeatherData(url: WEATHER_URL, parameters: params)
+        getWeatherData(url: WEATHER_URL, parameters: params) { (JSON) in
+            self.updateWeatherData(json: JSON)
+        }
+    }
+    
+    //Update UI with favorit city data
+    func favoritCityWeatherUpdate (city : String) {
+        fCities.forEach { favCity in
+            let city2 : String = favCity.fCity
+            if city2 == city {
+                let filtered = fCities.filter{ $0.fCity.contains(city) }
+                filtered.forEach {
+                    print($0)
+                    updateUIWithWeatherData(weatherData: $0)
+                }
+            }
+        }
     }
     
     //Write the PrepareForSegue Method here
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        if segue.identifier == "changeCityName" {
-            let destinationVC = segue.destination as! ChangeCityViewController
+         if segue.identifier == "toFavotitCities" {
+            let destinationVC = segue.destination as! FavoriteCitiesTableViewController
             
             destinationVC.delegate = self
+            destinationVC.favoritCities = fCities
         }
+        
     }
     
 }
